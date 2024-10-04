@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS opt_orders (
     FOREIGN KEY (product_id) REFERENCES opt_products(product_id)
 );
 
-EXPLAIN ANALYZE SELECT opt_clients.name, opt_clients.surname, 
+EXPLAIN ANALYZE 
+SELECT opt_clients.name, opt_clients.surname, 
 	   opt_products.product_name, opt_products.product_category, 
 	   opt_orders.order_date, 
 	   (SELECT COUNT(*) FROM opt_orders WHERE opt_orders.client_id = opt_clients.id) AS total_orders
@@ -38,10 +39,14 @@ WHERE opt_products.product_category = 'Category1' AND opt_clients.status = 'acti
   
 CREATE INDEX idx_orders_client_id ON opt_orders(client_id);
 CREATE INDEX idx_orders_product_id ON opt_orders(product_id);
-CREATE INDEX idx_clients_id_status ON opt_clients(id, status);
-CREATE INDEX idx_products_id_category ON opt_products(product_id, product_category);
+CREATE INDEX idx_clients_id_status ON opt_clients(status);
+CREATE INDEX idx_products_id_category ON opt_products(product_category);
 
-EXPLAIN ANALYZE WITH client_order_counts AS (SELECT client_id, COUNT(*) AS total_orders
+DROP INDEX idx_clients_id_status ON opt_clients;
+DROP INDEX idx_products_id_category ON opt_products;
+
+EXPLAIN ANALYZE 
+WITH client_order_counts AS (SELECT client_id, COUNT(*) AS total_orders
 FROM opt_orders
 GROUP BY client_id)
 
@@ -54,6 +59,20 @@ JOIN opt_products ON opt_orders.product_id = opt_products.product_id
 JOIN client_order_counts ON opt_clients.id = client_order_counts.client_id
 WHERE opt_products.product_category = 'Category1' AND opt_clients.status = 'active';
 
+CREATE TABLE opt_orders_test LIKE opt_orders;
 
+INSERT INTO opt_orders_test
+SELECT * FROM opt_orders;
 
+DROP INDEX idx_orders_product_id ON opt_orders_test;
+DROP INDEX idx_orders_client_id ON opt_orders_test;
 
+EXPLAIN ANALYZE 
+SELECT opt_clients.name, opt_clients.surname, 
+       opt_products.product_name, opt_products.product_category, 
+       opt_orders_test.order_date, 
+       (SELECT COUNT(*) FROM opt_orders_test WHERE opt_orders_test.client_id = opt_clients.id) AS total_orders
+FROM opt_orders_test
+JOIN opt_clients ON opt_orders_test.client_id = opt_clients.id
+JOIN opt_products ON opt_orders_test.product_id = opt_products.product_id
+WHERE opt_products.product_category = 'Category1' AND opt_clients.status = 'active';
